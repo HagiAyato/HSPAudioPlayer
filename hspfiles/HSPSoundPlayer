@@ -1,0 +1,281 @@
+;	window内音声ファイル再生サンプル
+#include "DD.hsp"
+#cmpopt varname 1
+
+	tm=0
+	pl=0
+	alltime=0
+	at=0
+	nt=0.0
+	pt=0//再生開始地点
+	vol=100
+	spd=100
+	lo=1
+	ro=1
+	nvol=10*vol
+	nspd=10*spd
+	roop=0
+	mci "set HSP time format milliseconds"
+	mci "set HSP audio all on"
+	DandD_SetWindow(1)
+	DandD_SetSubLabel(*DDload)
+	goto *main
+	stop
+	
+*main
+	onexit *dlcan
+	title "File player"
+	screen 0,640,480,0
+	cls 4
+	objsize 60,32
+	pos 0,0
+	fname="No file selected."
+	button gosub "LOAD",*load
+	pos 60,0
+	button gosub "PLAY",*play
+	pos 120,0
+	button gosub "PAUSE",*st
+	pos 180,0
+	button gosub "STOP",*st2
+	pos 240,0
+	button gosub "END",*dlcan
+	pos 300,0
+	button gosub "EDIT",*edit
+	pos 360,0
+	chkbox "AUTO",roop
+	pos 0,30
+	mesbox fname,500,30
+	gosub *mesdis
+	onclick gosub *mousec
+	stop
+
+*DDload
+	stop
+
+*load
+	dialog "wav;*.mid;*.mp3;*.avi;*.asf;*.wmv;*.wma;*.mpg",16,"再生可能ファイル"
+	if stat!=0{
+		gosub *load2
+	}
+	return
+
+*load2
+	fname=refstr
+	fn=getpath(fname,8)
+	fk=getpath(fname,2)
+	clrobj 7,7
+	pos 0,30
+	if (fk=".wav"||fk=".mid"||fk=".mp3"||fk=".avi"||fk=".asf"||fk=".wmv"||fk=".wma"||fk=".mpg"||fk=".WAV"||fk=".MID"||fk=".MP3"||fk=".AVI"||fk=".ASF"||fk=".WMV"||fk=".WMA"||fk=".MPG"){
+		mci "close bgm"
+		pt=0
+		mci "open \""+fname+"\" type mpegvideo alias bgm"
+		vol=100
+		spd=100
+		nvol=10*vol
+		nspd=10*spd
+		lo=1
+		ro=1
+		mci "setaudio bgm volume to "+nvol
+		mci "set bgm speed "+nspd
+		mci "status bgm length"
+		strall=strf("%02d",stat/1000/60)+":"+strf("%02d",stat/1000\60)+""
+		at=stat
+		pro="Title : "+fn
+		mci "info bgm product"
+		pro+="\nProduct : "+refstr
+		mci "capability bgm device type"
+		pro+="\nType : "+refstr
+		title "File player ["+fn+"]"
+		mesbox pro,500,30
+	}else{
+		fn="Can't play file."
+		mesbox fn,500,30
+		alltime=0
+	}
+	gosub *mesdis
+
+*play
+	//再生
+	pos 0,64
+	if(fname!="No file selected."||fn!="Can't play file."){
+		mci "play bgm from "+pt
+		title "File player ["+fn+"](Play)"
+	    repeat
+	    	onerror gosub *st2
+	        mci "status bgm position" ; 再生時間取得
+	        pt=stat
+	        mci "status bgm tempo"
+			tm=stat
+	        nt=double(pt*360/at)
+	        if(nt>=360){
+		        pt=0
+		        gosub *st2
+		        break
+		    }
+			gosub *mesdis
+	        await 100
+	    loop
+	}
+	stop
+	
+*st
+	//一時停止
+	mci "pause bgm"
+	title "File player ["+fname+"](Pause)"
+	stop
+
+*st2
+	//停止
+	mci "close bgm"
+	pt=0
+	spd=100
+	vol=100
+	lo=1
+	ro=1
+	title "File player ["+fname+"]"
+	mci "open \""+fname+"\" type mpegvideo alias bgm"
+	if roop==1{
+		goto *play
+	}
+	gosub *mesdis
+	return
+	
+*edit
+	//関連ソフトを開く
+	mci "close bgm"
+	if fk=".mid"{
+		exec "C:/DTM/DOMINO/Domino.exe "+fname+""
+	}
+	if fk=".wav"{
+		exec "C:/Program Files (x86)/SoundEngine Free/SoundEngine.exe "+fname+""
+	}
+	wait 5000
+	goto *st2
+	stop
+
+*dlcan
+	//終了時
+	mci "stop bgm"
+	mci "close bgm"
+	end
+
+*mousec
+	if(0<=mousex && mousex<=360 && 70<=mousey && mousey<=100){
+		gosub *scrt
+	}
+	if(5<=mousex && mousex<=35 && 150<=mousey && mousey<=250){
+		gosub *volc
+	}
+	if(55<=mousex && mousex<=85 && 150<=mousey && mousey<=249){
+		gosub *spdc
+	}
+	if(105<=mousex && mousex<=135 && 150<=mousey && mousey<=180){
+		gosub *left
+	}
+	if(155<=mousex && mousex<=185 && 150<=mousey && mousey<=180){
+		gosub *right
+	}
+	return
+	
+*scrt
+	if(at!=0){
+		pt=int(at*mousex/360)
+		nt=double(pt*360/at)
+		mci "seek bgm to "+pt
+		gosub *mesdis
+	}
+	return
+
+*volc
+	//音量
+	vol=250-mousey
+	nvol=vol*10
+	mci "setaudio bgm volume to "+nvol
+	mci "status bgm position" ; 再生時間取得
+	pt=stat
+	mci "status bgm tempo"
+	tm=stat
+	gosub *mesdis
+	return
+	
+*spdc
+	//速度
+	spd=(250-mousey)*2
+	nspd=spd*10
+	mci "set bgm speed "+nspd
+	mci "status bgm position" ; 再生時間取得
+	pt=stat
+	mci "status bgm tempo"
+	tm=stat
+	gosub *mesdis
+	return
+	
+*left
+	//左ミュート
+	if(lo=1){
+		lo=0
+		mci "set bgm audio left off"
+	}else{
+		lo=1
+		mci "set bgm audio left on"
+	}
+	gosub *mesdis
+	return
+	
+*right
+	//右ミュート
+	if(ro=1){
+		ro=0
+		mci "set bgm audio right off"
+	}else{
+		ro=1
+		mci "set bgm audio right on"
+	}
+	gosub *mesdis
+	return
+
+*tmp
+	return
+
+*mesdis
+	redraw 0
+	//リセット
+	color 0,0,0
+	boxf 0
+	//音量
+	color 255,255,255
+	pos 0,110
+	mes "Volume\n"+vol+"%"
+	boxf 5,150,35,250
+	color 0,0,255
+	boxf 5,250-vol,35,250
+	//速度
+	color 255,255,255
+	pos 50,110
+	mes "Speed\n"+spd+"%"
+	boxf 55,150,85,250
+	color 255,0,0
+	boxf 55,250-spd/2,85,250
+	//左オーディオ
+	color 255,255,255
+	pos 100,110
+	mes "Left"
+	boxf 105,150,135,180
+	color 255,180,0
+	boxf 105,150,135,150+30*lo
+	//右オーディオ
+	color 255,255,255
+	pos 150,110
+	mes "Right"
+	boxf 155,150,185,180
+	color 255,180,0
+	boxf 155,150,185,150+30*ro
+	//再生位置
+	color 255,255,255
+	boxf 0,70,360,100
+	pos 370,75
+	mes "Time : "+strf("%02d",pt/1000/60)+":"+strf("%02d",pt/1000\60)+"/"+strall+" Tempo : "+tm+"\n"
+	color 0,255,0
+	boxf 0,70,int(nt),100
+	redraw 1
+	return
